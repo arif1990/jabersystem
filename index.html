@@ -1221,10 +1221,14 @@ async function testGsConfig(){
 async function syncToGS(type,payload){
   if(!gsConfig.aktif||!gsConfig.url)return;
   try{
-    await fetch(gsConfig.url,{method:'POST',mode:'no-cors',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({type,...payload})});
-  }catch(e){}
+    // Apps Script requires form data or URL params for cross-origin POST
+    const params=new URLSearchParams({type,...Object.fromEntries(
+      Object.entries(payload).map(([k,v])=>[k,String(v)])
+    )});
+    // Try GET with params first (works with no-cors)
+    const url=gsConfig.url+'?'+params.toString();
+    await fetch(url,{method:'GET',mode:'no-cors'});
+  }catch(e){console.log('GS sync error:',e);}
 }
 
 </script>
