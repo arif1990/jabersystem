@@ -448,7 +448,7 @@ let secLog=[
 // STATE
 // ══════════════════════════════════════════════════════
 let CU=null,NAV=null;
-let gsConfig={url:"",aktif:false};
+let gsConfig=(()=>{try{const s=localStorage.getItem('jb_gs');return s?JSON.parse(s):{url:'',aktif:false};}catch(e){return {url:'',aktif:false};}})();
 let gajiFilter="semua",hppTab="paving",fmTab="paving",fmPid=null;
 let secArah="masuk",histFilter="semua",mesinTab="vibro";
 let rwFilter="",rwType="paving";
@@ -784,6 +784,7 @@ function savePaving(){
   document.getElementById("pPid").value="";document.getElementById("pMesin").value="";
   document.getElementById("pJml").value="";document.getElementById("pCat").value="";
   document.getElementById("pConv").style.display="none";document.getElementById("pCost").style.display="none";
+  syncToGS("paving",{pid,nama:prod.nama,jml,m2:+(prod.m2*jml).toFixed(3),date,mesinNama:mesin.nama});
 }
 
 // ══════════════════════════════════════════════════════
@@ -852,6 +853,7 @@ function saveBuis(){
   document.getElementById("bPid").value="";document.getElementById("bMesin").value="";
   document.getElementById("bJml").value="";document.getElementById("bCat").value="";
   document.getElementById("bCost").style.display="none";
+  syncToGS("buis",{pid,nama:prod.nama,jml,date,mesinNama:mesin.nama});
 }
 
 // ══════════════════════════════════════════════════════
@@ -1197,12 +1199,15 @@ function saveGsConfig(){
   if(!url){alert('URL wajib diisi');return;}
   if(!url.includes('script.google.com')){alert('URL tidak valid');return;}
   gsConfig={url,aktif:true};
+  try{localStorage.setItem('jb_gs',JSON.stringify(gsConfig));}catch(e){}
   addLog('Setting','Google Sheets URL disimpan','mesin');
   go('master');
 }
 function resetGsConfig(){
   if(!confirm('Reset URL Google Sheets?'))return;
-  gsConfig={url:'',aktif:false};go('master');
+  gsConfig={url:'',aktif:false};
+  try{localStorage.removeItem('jb_gs');}catch(e){}
+  go('master');
 }
 async function testGsConfig(){
   const url=document.getElementById('gsUrl').value.trim();
@@ -1221,14 +1226,29 @@ async function testGsConfig(){
 async function syncToGS(type,payload){
   if(!gsConfig.aktif||!gsConfig.url)return;
   try{
-    // Apps Script requires form data or URL params for cross-origin POST
-    const params=new URLSearchParams({type,...Object.fromEntries(
-      Object.entries(payload).map(([k,v])=>[k,String(v)])
-    )});
-    // Try GET with params first (works with no-cors)
+    const params=new URLSearchParams();
+    params.append('type',type);
+    Object.entries(payload).forEach(([k,v])=>params.append(k,String(v)));
     const url=gsConfig.url+'?'+params.toString();
-    await fetch(url,{method:'GET',mode:'no-cors'});
-  }catch(e){console.log('GS sync error:',e);}
+    const r=await fetch(url,{method:'GET',mode:'cors'});
+    if(r.ok){
+      const data=await r.json();
+      if(data.status==='success'){
+        console.log('GS Sync OK:',data.message);
+      } else {
+        console.warn('GS Sync warn:',data.message);
+      }
+    }
+  }catch(e){
+    // Fallback: coba no-cors jika cors gagal
+    try{
+      const params2=new URLSearchParams();
+      params2.append('type',type);
+      Object.entries(payload).forEach(([k,v])=>params2.append(k,String(v)));
+      await fetch(gsConfig.url+'?'+params2.toString(),{method:'GET',mode:'no-cors'});
+      console.log('GS Sync sent (no-cors fallback)');
+    }catch(e2){console.log('GS Sync error:',e2);}
+  }
 }
 
 </script>
