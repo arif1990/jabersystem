@@ -400,7 +400,7 @@ let mesinList=[
 ];
 
 let prodPav=[
-  {id:1,date:"2026-05-11",pid:"P06",nama:"Bata K300 6cm",    mesinId:"M01",mesinNama:"Vibro A",jml:1500,m2:30.0,tenaga:123, total:184500,cat:""},
+  {id:1,date:"2026-05-11",pid:"P06",nama:"Bata K300 6cm",    mesinId:"M01",mesinNama:"Vibro A",jml:1500,m2:30.0,tenaga:123, total:184500,uangMakan:0,gantiCetakan:0,lainLain:0,bon:0,cat:""},
   {id:2,date:"2026-05-11",pid:"P13",nama:"Segi Enam K300 6cm",mesinId:"M02",mesinNama:"Vibro B",jml:900, m2:20.8,tenaga:207, total:186300,cat:""},
   {id:3,date:"2026-05-10",pid:"P16",nama:"Grassblock",        mesinId:"M03",mesinNama:"Vibro C",jml:400, m2:16.0,tenaga:1213,total:485200,cat:"Cuaca panas"},
 ];
@@ -438,7 +438,10 @@ let CU=null,NAV=null;
 
 
 let mesinTab="vibro";let histFilter="semua";let gajiFilter="semua";
-let fmPid=null;let fmTab="paving";let hppTab="paving";
+let fmPid=null;
+let gajiWeek=null;
+let gajiStatus={};
+let gajiKonfirmasi={};let fmTab="paving";let hppTab="paving";
 let rwFilter="",rwType="paving";
 let editMesinId=null;
 
@@ -454,6 +457,249 @@ const getMesinByTipe=t=>mesinList.filter(m=>m.tipe===t&&m.aktif);
 const getMesinAll=()=>mesinList.filter(m=>m.aktif);
 const calcCostPav=(pid,jml)=>{const f=formula[pid];if(!f)return 0;return((f.semen*f.hs+f.pasir*f.hp+f.abu*f.ha+f.air*f.hair+f.add*f.hadd)/100)*jml;};
 const calcCostBuis=(pid,jml)=>{const f=formula[pid];if(!f)return 0;return(f.semen*f.hs+f.pasir*f.hp+f.krosok*f.hk+f.air*f.hair+f.besi*f.hb)*jml;};
+function pgRiwayatGaji(){
+  var allData=[...prodPav,...prodBuis];
+  var weeks=getUniqueWeeks(allData);
+  if(weeks.length===0){
+    return '<div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Riwayat Gaji</div></div></div>'
+      +'<div class="empty"><div style="font-size:40px;margin-bottom:8px">📋</div>'
+      +'<div style="font-size:14px;font-weight:600;color:#475569">Belum ada data</div></div>';
+  }
+  var selWeek=gajiWeek||weeks[0];
+  var weekOpts=weeks.map(function(w){
+    return '<option value="'+w.senin+'"'+(selWeek.senin===w.senin?' selected':'')+'>'+getWeekLabel(w)+'</option>';
+  }).join('');
+
+  var allRekap=[...rekapMesinWeek(prodPav,selWeek),...rekapMesinWeek(prodBuis,selWeek)];
+  var totalNet=allRekap.reduce(function(a,b){return a+b.totalBersih;},0);
+
+  var rows=allRekap.map(function(m){
+    return '<div class="rw-card" style="border-left:3px solid #2563EB">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+      +'<div><div style="font-weight:700;font-size:14px">'+m.mesinNama+'</div>'
+      +'<div style="font-size:11px;color:#94A3B8">'+m.totalProd.toLocaleString("id-ID")+' biji</div></div>'
+      +'<div style="font-weight:800;font-size:17px;color:#F97316">'+Rp(m.totalBersih)+'</div></div>'
+      +'<div style="display:flex;gap:6px;font-size:11px">'
+      +'<span style="background:#EFF6FF;color:#2563EB;border-radius:6px;padding:3px 8px">Gaji: '+Rp(m.totalCost)+'</span>'
+      +'<span style="background:#F0FDF4;color:#15803D;border-radius:6px;padding:3px 8px">+'+Rp(m.totalMakan+m.totalCetakan+m.totalLain)+'</span>'
+      +(m.totalBon>0?'<span style="background:#FEF2F2;color:#DC2626;border-radius:6px;padding:3px 8px">BON -'+Rp(m.totalBon)+'</span>':'')
+      +'</div>'
+      +'<button onclick="showDetailGaji(this)" data-id="'+m.mesinId+'" data-nm="'+m.mesinNama+'" '
+      +'style="margin-top:8px;width:100%;background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:10px;'
+      +'padding:8px;font-size:12px;font-weight:600;color:#475569;cursor:pointer">Lihat Rincian Harian</button>'
+      +'</div>';
+  }).join('');
+
+  return '<div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Riwayat Gaji</div></div></div>'
+    +'<div class="field" style="margin-bottom:14px">'
+    +'<select class="inp" onchange="gajiWeek=getWeekRange(this.value);go(&quot;riwayat_gaji&quot;)">'+weekOpts+'</select></div>'
+    +'<div style="background:linear-gradient(135deg,#1D4ED8,#3B82F6);border-radius:16px;padding:14px;text-align:center;margin-bottom:14px;color:#fff">'
+    +'<div style="font-size:11px;opacity:.7">TOTAL GAJI '+getWeekLabel(selWeek).toUpperCase()+'</div>'
+    +'<div style="font-size:26px;font-weight:900">'+Rp(totalNet)+'</div>'
+    +'</div>'
+    +(rows||'<div class="empty"><div style="font-size:36px;margin-bottom:8px">📅</div>'
+      +'<div style="font-size:14px;font-weight:600;color:#475569">Tidak ada data minggu ini</div></div>');
+}
+
+// ── Export CSV ──────────────────────────────────────────
+function getRekapData(mesinId){
+  var selWeek=gajiWeek||getWeekRange(null);
+  var allProd=[...prodPav,...prodBuis].filter(function(p){
+    return p.mesinId===mesinId && isInWeek(p.date,selWeek);
+  });
+  var mesinNama=allProd.length>0?allProd[0].mesinNama:mesinId;
+  var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  var dates=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(selWeek.senin);d.setDate(d.getDate()+i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+  return {selWeek,allProd,mesinNama,days,dates};
+}
+
+// ── Print Slip Gaji ─────────────────────────────────────
+function buildSlipHTML(mesinId, mesinNama, single){
+  var data=getRekapData(mesinId);
+  var selWeek=data.selWeek;
+  var totalGaji=data.allProd.reduce(function(a,b){return a+(b.total||0);},0);
+  var totalMakan=data.allProd.reduce(function(a,b){return a+(b.uangMakan||0);},0);
+  var totalCetakan=data.allProd.reduce(function(a,b){return a+(b.gantiCetakan||0);},0);
+  var totalLain=data.allProd.reduce(function(a,b){return a+(b.lainLain||0);},0);
+  var totalBon=data.allProd.reduce(function(a,b){return a+(b.bon||0);},0);
+  var totalNet=totalGaji+totalMakan+totalCetakan+totalLain-totalBon;
+  var totalBiji=data.allProd.reduce(function(a,b){return a+b.jml;},0);
+
+  // Baris rincian per hari
+  var dayRows='';
+  data.days.forEach(function(day,i){
+    var dayProds=data.allProd.filter(function(p){return p.date===data.dates[i];});
+    if(dayProds.length>0){
+      dayProds.forEach(function(p,pi){
+        var net=(p.total||0)+(p.uangMakan||0)+(p.gantiCetakan||0)+(p.lainLain||0)-(p.bon||0);
+        dayRows+='<tr>'
+          +'<td>'+(pi===0?day:'')+'</td>'
+          +'<td>'+p.nama.replace('Paving ','').replace('Buis Beton ','')+'</td>'
+          +'<td class="r">'+p.jml.toLocaleString('id-ID')+'</td>'
+          +'<td class="r">'+fmtRp(p.total||0)+'</td>'
+          +'<td class="r">'+(p.uangMakan||0)>0?fmtRp(p.uangMakan):'-'+'</td>'
+          +'<td class="r">'+(p.gantiCetakan||0)>0?fmtRp(p.gantiCetakan):'-'+'</td>'
+          +'<td class="r">'+(p.lainLain||0)>0?fmtRp(p.lainLain):'-'+'</td>'
+          +'<td class="r red">'+(p.bon||0)>0?fmtRp(p.bon):'-'+'</td>'
+          +'<td class="r bold">'+fmtRp(net)+'</td>'
+          +'</tr>';
+      });
+    }
+  });
+
+  return '<div class="slip">'
+    +'<div class="header">'
+    +'<div class="company">UD. JAYA BERKAH</div>'
+    +'<div class="addr">Jl. Paving Kudus, Jawa Tengah | Telp: -</div>'
+    +'<div class="title">SLIP GAJI MINGGUAN</div>'
+    +'<div class="period">Periode: '+getWeekLabel(selWeek)+' (Senin–Sabtu)</div>'
+    +'</div>'
+    +'<div class="divider"></div>'
+    +'<table class="info">'
+    +'<tr><td>Mesin/Pembuat</td><td>:</td><td><b>'+mesinNama+'</b></td>'
+    +'<td>Total Produksi</td><td>:</td><td><b>'+totalBiji.toLocaleString('id-ID')+' biji</b></td></tr>'
+    +'<tr><td>Tgl Bayar</td><td>:</td><td>'+selWeek.sabtu+'</td>'
+    +'<td>Hari Kerja</td><td>:</td><td>Senin – Sabtu</td></tr>'
+    +'</table>'
+    +'<div class="divider"></div>'
+    +'<table class="detail">'
+    +'<thead><tr>'
+    +'<th>Hari</th><th>Produk</th><th class="r">Biji</th>'
+    +'<th class="r">Gaji Prod.</th><th class="r">Makan</th>'
+    +'<th class="r">Cetakan</th><th class="r">Lain</th>'
+    +'<th class="r">BON</th><th class="r">Net</th>'
+    +'</tr></thead>'
+    +'<tbody>'+dayRows+'</tbody>'
+    +'</table>'
+    +'<div class="divider"></div>'
+    +'<table class="summary">'
+    +'<tr><td>Gaji Produksi</td><td class="r">'+fmtRp(totalGaji)+'</td>'
+    +'<td class="r">+</td><td>Uang Makan</td><td class="r">'+fmtRp(totalMakan)+'</td></tr>'
+    +'<tr><td>Ganti Cetakan</td><td class="r">'+fmtRp(totalCetakan)+'</td>'
+    +'<td class="r">+</td><td>Biaya Lain-Lain</td><td class="r">'+fmtRp(totalLain)+'</td></tr>'
+    +'<tr><td colspan="2"></td><td class="r">-</td><td>BON/Potongan</td><td class="r red">'+fmtRp(totalBon)+'</td></tr>'
+    +'</table>'
+    +'<div class="net-box">'
+    +'<span class="net-label">TOTAL GAJI BERSIH</span>'
+    +'<span class="net-val">'+fmtRp(totalNet)+'</span>'
+    +'</div>'
+    +'<div class="sign">'
+    +'<div class="sign-col"><div>Penerima</div><br><br><br><div>(______________)</div><div class="sign-name">'+mesinNama+'</div></div>'
+    +'<div class="sign-col"><div>Mengetahui</div><br><br><br><div>(______________)</div><div class="sign-name">Mandor / Admin</div></div>'
+    +'<div class="sign-col"><div>Dibuat</div><br><br><br><div>(______________)</div><div class="sign-name">UD. Jaya Berkah</div></div>'
+    +'</div>'
+    +(single?'':'<div style="page-break-after:always"></div>')
+    +'</div>';
+}
+
+function fmtRp(n){return 'Rp '+n.toLocaleString('id-ID');}
+
+var SLIP_CSS='*{margin:0;padding:0;box-sizing:border-box}'
+  +'body{font-family:"Courier New",Courier,monospace;font-size:10px;background:#fff;color:#000}'
+  +'.slip{width:210mm;max-width:210mm;margin:0 auto;padding:12mm 14mm}'
+  +'@media print{body{margin:0}.slip{width:210mm;padding:10mm 12mm}@page{size:A4;margin:8mm}}'
+  +'.header{text-align:center;margin-bottom:8px}'
+  +'.company{font-size:16px;font-weight:bold;letter-spacing:2px}'
+  +'.addr{font-size:9px;color:#555;margin:2px 0}'
+  +'.title{font-size:13px;font-weight:bold;margin:6px 0 2px;text-decoration:underline}'
+  +'.period{font-size:10px}'
+  +'.divider{border-top:1.5px solid #000;margin:6px 0}'
+  +'table{width:100%;border-collapse:collapse}'
+  +'.info td{padding:2px 4px;font-size:10px}'
+  +'.detail th,.detail td{border:1px solid #ccc;padding:3px 5px;font-size:9px}'
+  +'.detail thead{background:#f0f0f0}'
+  +'.r{text-align:right}'
+  +'.bold{font-weight:bold}'
+  +'.red{color:#c00}'
+  +'.summary td{padding:2px 6px;font-size:10px}'
+  +'.net-box{display:flex;justify-content:space-between;align-items:center;'
+  +'background:#000;color:#fff;padding:8px 12px;margin:8px 0;border-radius:4px}'
+  +'.net-label{font-size:12px;font-weight:bold;letter-spacing:1px}'
+  +'.net-val{font-size:18px;font-weight:bold}'
+  +'.sign{display:flex;justify-content:space-around;margin-top:24px}'
+  +'.sign-col{text-align:center;font-size:10px}'
+  +'.sign-name{font-weight:bold;margin-top:3px;font-size:10px}';
+
+function printSlip(mesinId, mesinNama){
+  var body=buildSlipHTML(mesinId,mesinNama,true);
+  var win=window.open('','_blank','width=900,height=700');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
+    +'<title>Slip Gaji '+mesinNama+'</title>'
+    +'<style>'+SLIP_CSS+'</style></head><body>'+body+'</body></html>');
+  win.document.close();
+  setTimeout(function(){win.print();},600);
+}
+
+function printAllSlip(){
+  var selWeek=gajiWeek||getWeekRange(null);
+  var allRekap=[...rekapMesinWeek(prodPav,selWeek),...rekapMesinWeek(prodBuis,selWeek)];
+  var body=allRekap.map(function(m,i){
+    return buildSlipHTML(m.mesinId,m.mesinNama, i===allRekap.length-1);
+  }).join('');
+  var win=window.open('','_blank','width=900,height=700');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
+    +'<title>Slip Gaji Semua Mesin - '+getWeekLabel(selWeek)+'</title>'
+    +'<style>'+SLIP_CSS+'</style></head><body>'+body+'</body></html>');
+  win.document.close();
+  setTimeout(function(){win.print();},600);
+}
+
+function shareWA(el){
+  var mesinId=el.dataset?el.dataset.id:el;var mesinNama=el.dataset?el.dataset.nm:arguments[1];
+  var selWeek=gajiWeek||getWeekRange(null);
+  var allProd=[...prodPav,...prodBuis].filter(function(p){
+    return p.mesinId===mesinId && isInWeek(p.date,selWeek);
+  });
+  var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  var dates=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(selWeek.senin);d.setDate(d.getDate()+i);
+    dates.push({label:days[i],date:d.toISOString().slice(0,10)});
+  }
+  var totGaji=allProd.reduce(function(a,b){return a+(b.total||0);},0);
+  var totTunjangan=allProd.reduce(function(a,b){return a+(b.uangMakan||0)+(b.gantiCetakan||0)+(b.lainLain||0);},0);
+  var totBon=allProd.reduce(function(a,b){return a+(b.bon||0);},0);
+  var totNet=totGaji+totTunjangan-totBon;
+  var NL="\n";
+  var SEP="--------------------";
+  var lines=[];
+  lines.push("*SLIP GAJI MINGGUAN*");
+  lines.push("UD. Jaya Berkah - Kudus");
+  lines.push(SEP);
+  lines.push("Nama    : *"+mesinNama+"*");
+  lines.push("Periode : "+getWeekLabel(selWeek));
+  lines.push(SEP);
+  dates.forEach(function(day){
+    var dp=allProd.filter(function(p){return p.date===day.date;});
+    if(dp.length===0){lines.push("_"+day.label+": Libur_");return;}
+    dp.forEach(function(p){
+      var g=p.total||0,mk=p.uangMakan||0,ct=p.gantiCetakan||0,ll=p.lainLain||0,bn=p.bon||0;
+      lines.push(day.label+": "+p.jml.toLocaleString("id-ID")+" biji "+p.nama.slice(0,15));
+      lines.push("  Gaji: Rp "+g.toLocaleString("id-ID"));
+      if(mk||ct||ll) lines.push("  Tunjangan: +Rp "+(mk+ct+ll).toLocaleString("id-ID"));
+      if(bn) lines.push("  BON: -Rp "+bn.toLocaleString("id-ID"));
+    });
+  });
+  lines.push(SEP);
+  lines.push("Gaji Produksi : Rp "+totGaji.toLocaleString("id-ID"));
+  if(totTunjangan) lines.push("Tunjangan     : +Rp "+totTunjangan.toLocaleString("id-ID"));
+  if(totBon) lines.push("BON           : -Rp "+totBon.toLocaleString("id-ID"));
+  lines.push(SEP);
+  lines.push("*NET GAJI: Rp "+totNet.toLocaleString("id-ID")+"*");
+  lines.push(SEP);
+  lines.push("_Dikirim via JBIS - UD. Jaya Berkah_");
+  var msg=lines.join(NL);
+  var url="https://wa.me/?text="+encodeURIComponent(msg);
+  window.open(url,"_blank");
+  closeModalForce();
+}
+
+
+
 const badge=(s,m)=>{const mp={lunas:"badge-green ✓ Lunas",dp:"badge-blue DP",belum:"badge-red Belum",masuk:"badge-masuk ↘ Masuk",keluar:"badge-keluar ↗ Keluar"};const x=mp[s]||mp.belum;const[c,...r]=x.split(" ");return`<span class="badge ${c}">${r.join(" ")}</span>`;};
 function addLog(aksi,detail,type){historyLog.unshift({id:Date.now(),ts:ts(),user:CU.u,role:CU.role,aksi,detail,type});}
 
@@ -483,7 +729,7 @@ function doLogout(){CU=null;document.getElementById("appWrap").style.display="no
 // ══════════════════════════════════════════════════════
 const NAVS={
   owner:   [["dashboard","📊","Dashboard"],["mesin","⚙️","Mesin"],["gaji","💳","Gaji"],["formula_m","🧪","Formula"],["master","📋","Master"],["history","🕐","History"]],
-  admin:   [["gaji","💳","Penggajian"],["history","🕐","History"]],
+  admin:   [["gaji","💳","Penggajian"],["riwayat_gaji","📋","Riwayat"]],
   paving:  [["input_paving","✏️","Input"],["laporan_pav","📋","Riwayat"]],
   buis:    [["input_buis","✏️","Input"],["laporan_buis","📋","Riwayat"]],
   security:[["security","🚛","Log Kendaraan"],["riwayat_sec","📋","Riwayat"]],
@@ -507,7 +753,7 @@ function go(k){
   buildNav();
   const pg={
     dashboard:pgDashboard,mesin:pgMesin,gaji:pgGaji,
-    formula_m:pgFormula,master:pgMaster,history:pgHistory,riwayat_sec:pgRiwayatSec,
+    formula_m:pgFormula,master:pgMaster,history:pgHistory,riwayat_sec:pgRiwayatSec,riwayat_gaji:pgRiwayatGaji,
     input_paving:pgInputPaving,input_buis:pgInputBuis,
     laporan_pav:()=>pgRiwayat("paving"),laporan_buis:()=>pgRiwayat("buis"),
     security:pgSecurity,
@@ -688,7 +934,7 @@ function pgInputPaving(){
   const pavingMesin=mesinList.filter(m=>m.tipe==="Vibro"||m.tipe==="Manual");
   return`
   <div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Input Produksi Paving</div></div><div class="sec-sub">Vibro A–E & Press Manual 1–3</div></div>
-  <div id="toastP" class="toast">✅ Tersimpan! Stok & Google Sheet otomatis update.</div>
+  <div id="toastP" class="toast">Tersimpan! Stok & Google Sheet otomatis update.</div>
   <div class="card">
     <div class="field"><label class="field-label">Tanggal <span class="req">*</span></label><input type="date" id="pDate" class="inp" value="${todayS()}"/></div>
     <div class="field"><label class="field-label">Mesin <span class="req">*</span></label>
@@ -707,25 +953,51 @@ function pgInputPaving(){
       <input type="number" inputmode="numeric" id="pJml" class="inp" placeholder="0" oninput="updPavCalc()"/>
     </div>
     <div id="pConv" style="display:none" class="conv-box">
-      <div style="color:var(--blue2);font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:2px"> KONVERSI OTOMATIS</div>
+      <div style="color:var(--blue2);font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:2px">KONVERSI OTOMATIS</div>
       <div class="conv-grid">
         <div class="conv-cell"><div class="conv-val" id="pBijiD" style="color:var(--blue2)">0</div><div class="conv-unit">BIJI</div></div>
-        <div class="conv-cell"><div class="conv-val" id="pM2D" style="color:var(--green)">0.00</div><div class="conv-unit">M²</div></div>
+        <div class="conv-cell"><div class="conv-val" id="pM2D" style="color:var(--green)">0.00</div><div class="conv-unit">M&#178;</div></div>
       </div>
       <div class="conv-note" id="pM2Note">—</div>
     </div>
     <div id="pCost" style="display:none" class="cost-box">
-      <div class="cost-head"> COST PRODUKSI OTOMATIS</div>
+      <div class="cost-head">COST PRODUKSI OTOMATIS</div>
       <div class="cost-row"><span class="cost-label">Biaya Tenaga</span><span class="cost-val" id="pCT">Rp 0</span></div>
       <div class="cost-row"><span class="cost-label">Biaya Bahan</span><span class="cost-val" id="pCB" style="color:var(--text3)">—</span></div>
       <hr class="cost-divider"/>
       <div class="cost-row"><span class="cost-total-label">TOTAL COST</span><span class="cost-total-val" id="pTotal">Rp 0</span></div>
     </div>
+
+    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:12px;color:#15803D;margin-bottom:10px">TUNJANGAN HARIAN</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label class="field-label" style="font-size:10px">Uang Makan (Rp)</label>
+          <input type="number" inputmode="numeric" id="pUangMakan" class="inp" placeholder="0" value="0"/>
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10px">Ganti Cetakan (Rp)</label>
+          <input type="number" inputmode="numeric" id="pGantiCetakan" class="inp" placeholder="0" value="0"/>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label class="field-label" style="font-size:10px">Biaya Lain-Lain (Rp)</label>
+          <input type="number" inputmode="numeric" id="pLainLain" class="inp" placeholder="0" value="0"/>
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10px;color:#DC2626">BON / Potongan (Rp)</label>
+          <input type="number" inputmode="numeric" id="pBon" class="inp" placeholder="0" value="0" style="border-color:#FCA5A5"/>
+        </div>
+      </div>
+    </div>
+
     <div class="field"><label class="field-label">Catatan (opsional)</label><textarea id="pCat" class="inp" rows="2" placeholder="Kendala, kondisi mesin, dll"></textarea></div>
-    <button class="btn btn-blue btn-full" onclick="savePaving()"> Simpan & Update Stok →</button>
+    <button class="btn btn-blue btn-full" onclick="savePaving()">Simpan & Update Stok &#8594;</button>
     <div style="color:var(--text3);font-size:11px;text-align:center;margin-top:6px">Data otomatis masuk ke Google Sheet & stok</div>
   </div>`;
 }
+
 function updPavCalc(){
   const pid=document.getElementById("pPid")?.value;
   const mesinId=document.getElementById("pMesin")?.value;
@@ -762,16 +1034,27 @@ function savePaving(){
   const jml=+document.getElementById("pJml").value;
   const date=document.getElementById("pDate").value;
   const cat=document.getElementById("pCat").value;
+  const uangMakan=+document.getElementById("pUangMakan").value||0;
+  const gantiCetakan=+document.getElementById("pGantiCetakan").value||0;
+  const lainLain=+document.getElementById("pLainLain").value||0;
+  const bon=+document.getElementById("pBon").value||0;
   if(!pid||!mesinId||!jml){alert("Isi mesin, produk, dan jumlah dulu");return;}
   const prod=PAVING.find(p=>p.id===pid);
   const mesin=mesinList.find(m=>m.id===mesinId);
   const cb=calcCostPav(pid,jml);
   const ct=mesin.tarif*jml;
-  prodPav.unshift({id:Date.now(),date,pid,nama:prod.nama,mesinId,mesinNama:mesin.nama,jml,m2:+(prod.m2*jml).toFixed(2),tenaga:mesin.tarif,total:ct+(cb||0),cat});
-  addLog("Input Produksi Paving",`${prod.nama} — ${mesin.nama} — ${N(jml)} biji (${(prod.m2*jml).toFixed(1)} m²) — ${Rp(ct+(cb||0))}`,"prod");
+  const totalBersih=(ct+(cb||0))+uangMakan+gantiCetakan+lainLain-bon;
+  prodPav.unshift({
+    id:Date.now(),date,pid,nama:prod.nama,mesinId,mesinNama:mesin.nama,
+    jml,m2:+(prod.m2*jml).toFixed(2),tenaga:mesin.tarif,
+    total:ct+(cb||0),uangMakan,gantiCetakan,lainLain,bon,totalBersih,cat
+  });
+  addLog("Input Produksi Paving",`${prod.nama} — ${mesin.nama} — ${N(jml)} biji — ${Rp(ct+(cb||0))} + tunjangan ${Rp(uangMakan+gantiCetakan+lainLain)} - bon ${Rp(bon)}`,"prod");
   const t=document.getElementById("toastP");t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3500);
   document.getElementById("pPid").value="";document.getElementById("pMesin").value="";
   document.getElementById("pJml").value="";document.getElementById("pCat").value="";
+  document.getElementById("pUangMakan").value="0";document.getElementById("pGantiCetakan").value="0";
+  document.getElementById("pLainLain").value="0";document.getElementById("pBon").value="0";
   document.getElementById("pConv").style.display="none";document.getElementById("pCost").style.display="none";
   syncToGS("paving",{pid,nama:prod.nama,jml,m2:+(prod.m2*jml).toFixed(3),date,mesinNama:mesin.nama});
 }
@@ -783,8 +1066,8 @@ function pgInputBuis(){
   const buisMesin=mesinList.filter(m=>m.tipe==="Buis");
   const opts=BUIS_G.map(g=>`<optgroup label="── ${g.g} ──">${g.items.map(b=>`<option value="${b.id}">${b.nama} — ${Rp(b.tenaga)}/biji</option>`).join("")}</optgroup>`).join("");
   return`
-  <div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Input Produksi Buis Beton</div></div><div class="sec-sub">28 jenis produk</div></div>
-  <div id="toastB" class="toast">✅ Tersimpan! Stok & Google Sheet otomatis update.</div>
+  <div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Input Produksi Buis Beton</div></div><div class="sec-sub">31 jenis produk</div></div>
+  <div id="toastB" class="toast">Tersimpan! Stok & Google Sheet otomatis update.</div>
   <div class="card">
     <div class="field"><label class="field-label">Tanggal <span class="req">*</span></label><input type="date" id="bDate" class="inp" value="${todayS()}"/></div>
     <div class="field"><label class="field-label">Mesin Buis <span class="req">*</span></label>
@@ -800,16 +1083,36 @@ function pgInputBuis(){
       <input type="number" inputmode="numeric" id="bJml" class="inp" placeholder="0" oninput="updBuisCalc()"/>
     </div>
     <div id="bCost" style="display:none" class="cost-box">
-      <div class="cost-head"> COST PRODUKSI OTOMATIS</div>
+      <div class="cost-head">COST PRODUKSI OTOMATIS</div>
       <div class="cost-row"><span class="cost-label">Biaya Tenaga</span><span class="cost-val" id="bCT">Rp 0</span></div>
       <div class="cost-row"><span class="cost-label">Biaya Bahan</span><span class="cost-val" id="bCB" style="color:var(--text3)">—</span></div>
       <hr class="cost-divider"/>
       <div class="cost-row"><span class="cost-total-label">TOTAL COST</span><span class="cost-total-val" id="bTotal">Rp 0</span></div>
     </div>
+
+    <div style="background:#F0FDF4;border:1.5px solid #BBF7D0;border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:12px;color:#15803D;margin-bottom:10px">TUNJANGAN HARIAN</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label class="field-label" style="font-size:10px">Uang Makan (Rp)</label>
+          <input type="number" inputmode="numeric" id="bUangMakan" class="inp" placeholder="0" value="0"/>
+        </div>
+        <div>
+          <label class="field-label" style="font-size:10px">Biaya Lain-Lain (Rp)</label>
+          <input type="number" inputmode="numeric" id="bLainLain" class="inp" placeholder="0" value="0"/>
+        </div>
+      </div>
+      <div>
+        <label class="field-label" style="font-size:10px;color:#DC2626">BON / Potongan (Rp)</label>
+        <input type="number" inputmode="numeric" id="bBon" class="inp" placeholder="0" value="0" style="border-color:#FCA5A5"/>
+      </div>
+    </div>
+
     <div class="field"><label class="field-label">Catatan (opsional)</label><textarea id="bCat" class="inp" rows="2" placeholder="Kendala, kondisi mesin, dll"></textarea></div>
-    <button class="btn btn-blue btn-full" onclick="saveBuis()"> Simpan & Update Stok →</button>
+    <button class="btn btn-blue btn-full" onclick="saveBuis()">Simpan & Update Stok &#8594;</button>
   </div>`;
 }
+
 function updBuisCalc(){
   const pid=document.getElementById("bPid")?.value;
   const mesinId=document.getElementById("bMesin")?.value;
@@ -831,16 +1134,25 @@ function saveBuis(){
   const jml=+document.getElementById("bJml").value;
   const date=document.getElementById("bDate").value;
   const cat=document.getElementById("bCat").value;
+  const uangMakan=+document.getElementById("bUangMakan").value||0;
+  const lainLain=+document.getElementById("bLainLain").value||0;
+  const bon=+document.getElementById("bBon").value||0;
   if(!pid||!mesinId||!jml){alert("Isi mesin, produk, dan jumlah dulu");return;}
-  const prod=BUIS.find(p=>p.id===pid);
+  const prod=BUIS.find(b=>b.id===pid);
   const mesin=mesinList.find(m=>m.id===mesinId);
   const cb=calcCostBuis(pid,jml);
   const ct=mesin.tarif*jml;
-  prodBuis.unshift({id:Date.now(),date,pid,nama:prod.nama,mesinId,mesinNama:mesin.nama,jml,tenaga:mesin.tarif,total:ct+(cb||0),cat});
+  const totalBersih=(ct+(cb||0))+uangMakan+lainLain-bon;
+  prodBuis.unshift({
+    id:Date.now(),date,pid,nama:prod.nama,mesinId,mesinNama:mesin.nama,
+    jml,tenaga:mesin.tarif,total:ct+(cb||0),uangMakan,lainLain,bon,totalBersih,cat
+  });
   addLog("Input Produksi Buis",`${prod.nama} — ${mesin.nama} — ${N(jml)} biji — ${Rp(ct+(cb||0))}`,"prod");
   const t=document.getElementById("toastB");t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3500);
   document.getElementById("bPid").value="";document.getElementById("bMesin").value="";
   document.getElementById("bJml").value="";document.getElementById("bCat").value="";
+  document.getElementById("bUangMakan").value="0";document.getElementById("bLainLain").value="0";
+  document.getElementById("bBon").value="0";
   document.getElementById("bCost").style.display="none";
   syncToGS("buis",{pid,nama:prod.nama,jml,date,mesinNama:mesin.nama});
 }
@@ -876,8 +1188,8 @@ function pgRiwayat(type){
         +'<div style="display:flex;justify-content:space-between;align-items:center">'
         +'<div style="font-size:12px;color:#F97316;font-weight:600">Cost: '+Rp(p.total)+'</div>'
         +'<div style="display:flex;gap:6px">'
-        +'<button onclick="openEditRw(&quot;'+type+'&quot;,'+p.id+')" style="border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Edit</button>'
-        +'<button onclick="hapusRw(&quot;'+type+'&quot;,'+p.id+')" style="border:none;background:#FEE2E2;color:#DC2626;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button>'
+        +'<button onclick="openEditRw(this)" data-type="'+type+'" data-id="'+p.id+'" style="border:1.5px solid #E2E8F0;background:#F8FAFC;color:#475569;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Edit</button>'
+        +'<button onclick="hapusRw(this)" data-type="'+type+'" data-id="'+p.id+'" style="border:none;background:#FEE2E2;color:#DC2626;border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">Hapus</button>'
         +'</div></div>'
         +(p.cat?'<div style="font-size:11px;color:#94A3B8;font-style:italic;margin-top:4px">'+p.cat+'</div>':'')
         +'</div>';
@@ -891,54 +1203,180 @@ function pgRiwayatRefresh(type){document.getElementById("mc").innerHTML=pgRiwaya
 // GAJI PER MESIN
 // ══════════════════════════════════════════════════════
 function pgGaji(){
-  // Hitung gaji per mesin dari data produksi
-  const gajiMesin=mesinList.map(m=>{
-    const prod=[...prodPav,...prodBuis].filter(p=>p.mesinId===m.id);
-    const totalBiji=prod.reduce((a,b)=>a+b.jml,0);
-    const totalGaji=prod.reduce((a,b)=>a+b.total,0);
-    return{...m,totalBiji,totalGaji,status:m.gajiStatus||"belum",met:m.gajiMet||"tunai"};
-  }).filter(m=>m.totalBiji>0);
+  var allData=[...prodPav,...prodBuis];
+  var weeks=getUniqueWeeks(allData);
+  if(weeks.length===0){
+    return '<div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Penggajian Mingguan</div></div></div>'
+      +'<div class="empty"><div style="font-size:40px;margin-bottom:8px">💰</div>'
+      +'<div style="font-size:15px;font-weight:600;color:#475569">Belum ada data produksi</div></div>';
+  }
+  var selWeek=gajiWeek||weeks[0];
+  gajiWeek=selWeek; // always sync
+  var weekOpts=weeks.map(function(w){
+    return '<option value="'+w.senin+'"'+(selWeek.senin===w.senin?' selected':'')+'>'+getWeekLabel(w)+'</option>';
+  }).join('');
+  var rekapPav=rekapMesinWeek(prodPav,selWeek);
+  var rekapBuis=rekapMesinWeek(prodBuis,selWeek);
+  var allRekap=[...rekapPav,...rekapBuis];
+  var totalNet=allRekap.reduce(function(a,b){return a+b.totalBersih;},0);
 
-  const total=gajiMesin.reduce((a,b)=>a+b.totalGaji,0);
-  const lunas=gajiMesin.filter(m=>m.status==="lunas").reduce((a,b)=>a+b.totalGaji,0);
-  const belum=gajiMesin.filter(m=>m.status!=="lunas").reduce((a,b)=>a+b.totalGaji,0);
-  const filtered=gajiFilter==="semua"?gajiMesin:gajiMesin.filter(m=>m.status===gajiFilter);
+  var kartu=allRekap.map(function(m){
+    var stat=gajiStatus[selWeek.senin+'_'+m.mesinId]||'belum';
+    var statStyle=stat==='sesuai'
+      ?'background:#DCFCE7;color:#15803D;border:1.5px solid #86EFAC;'
+      :'background:#FEF3C7;color:#92400E;border:1.5px solid #FCD34D;';
+    return '<div id="gaji-card-'+m.mesinId+'" class="card" style="margin-bottom:10px;border-left:4px solid '+(stat==="sesuai"?'#16A34A':'#E2E8F0')+';transition:all .3s">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">'
+      +'<div><div style="font-weight:700;font-size:15px">'+m.mesinNama+'</div>'
+      +'<div style="font-size:11px;color:#94A3B8">'+m.totalProd.toLocaleString("id-ID")+' biji</div></div>'
+      +'<div style="text-align:right"><div style="font-weight:800;font-size:18px;color:#F97316">'+Rp(m.totalBersih)+'</div>'
+      +(stat==='sesuai'?'<span style="background:#DCFCE7;color:#15803D;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">&#10003; Terkonfirmasi</span>':'')+'</div></div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">'
+      +'<div style="background:#EFF6FF;border-radius:8px;padding:8px;text-align:center">'
+      +'<div style="font-size:10px;color:#94A3B8">Gaji Produksi</div>'
+      +'<div style="font-weight:700;color:#2563EB;font-size:12px">'+Rp(m.totalCost)+'</div></div>'
+      +'<div style="background:#F0FDF4;border-radius:8px;padding:8px;text-align:center">'
+      +'<div style="font-size:10px;color:#94A3B8">Tunjangan</div>'
+      +'<div style="font-weight:700;color:#15803D;font-size:12px">+'+Rp(m.totalMakan+m.totalCetakan+m.totalLain)+'</div></div>'
+      +'<div style="background:#FEF2F2;border-radius:8px;padding:8px;text-align:center">'
+      +'<div style="font-size:10px;color:#94A3B8">BON</div>'
+      +'<div style="font-weight:700;color:#DC2626;font-size:12px">-'+Rp(m.totalBon)+'</div></div>'
+      +'</div>'
+      // Action buttons
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+      +'<button onclick="showDetailGaji(this)" data-id="'+m.mesinId+'" data-nm="'+m.mesinNama+'" '
+      +'style="background:#EFF6FF;color:#2563EB;border:1.5px solid #BFDBFE;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer">Rincian &amp; Export</button>'
+      +'<button onclick="konfirmasiGaji(this)" data-id="'+m.mesinId+'" data-nm="'+m.mesinNama+'" data-week="'+selWeek.senin+'" '
+      +'style="border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;'
+      +(stat==='sesuai'?'background:#16A34A;color:#fff;':'background:#FEF3C7;color:#92400E;border:1.5px solid #FCD34D;')
+      +'">'+(stat==='sesuai'?'&#10003; Confirmed':'Konfirmasi Sesuai')+'</button>'
+      +'</div>'
+      +'</div>';
+  }).join('');
 
-  return`
-  <div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Penggajian per Mesin</div></div><div class="sec-sub">Sabtu, ${new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"})}</div></div>
-  <div class="kpi-grid">
-    <div class="kpi"><div class="kpi-icon-wrap" style="background:#FFF7ED"></div><div class="kpi-label">Total Gaji</div><div class="kpi-val" style="color:var(--orange);font-size:16px">${Rp(total)}</div></div>
-    <div class="kpi"><div class="kpi-icon-wrap" style="background:#F0FDF4">✅</div><div class="kpi-label">Sudah Lunas</div><div class="kpi-val" style="color:var(--green);font-size:16px">${Rp(lunas)}</div></div>
-    <div class="kpi"><div class="kpi-icon-wrap" style="background:#FEF2F2">⏳</div><div class="kpi-label">Belum Bayar</div><div class="kpi-val" style="color:var(--red);font-size:16px">${Rp(belum)}</div></div>
-    <div class="kpi"><div class="kpi-icon-wrap" style="background:#EFF6FF">⚙️</div><div class="kpi-label">Jumlah Mesin</div><div class="kpi-val" style="color:var(--blue2)">${gajiMesin.length}</div></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="btn btn-green" style="flex:1;padding:11px" onclick="allMesinLunas()">✅ Semua Lunas</button>
-    <button class="btn btn-blue" style="flex:1;padding:11px" id="btnCopy" onclick="copyGaji()"> Copy Accurate</button>
-  </div>
-  <div class="filter-row">
-    ${["semua","belum","dp","lunas"].map(f=>`<button class="filter-pill${gajiFilter===f?" active":""}" onclick="gajiFilter='${f}';go('gaji')">${{semua:"Semua",belum:"Belum",dp:"DP",lunas:"Lunas"}[f]}</button>`).join("")}
-  </div>
-  ${filtered.length?filtered.map(m=>`
-    <div class="gaji-card">
-      <div class="gaji-head">
-        <div><div class="gaji-name">${m.nama}</div><div class="gaji-sub"> ${m.operator} · ${m.tipe}</div></div>
-        ${badge(m.status)}
-      </div>
-      <div class="gaji-detail">
-        <div class="gaji-row"><span class="gaji-key">Total Produksi</span><span class="gaji-val">${N(m.totalBiji)} biji</span></div>
-        <div class="gaji-row"><span class="gaji-key">Tarif/biji</span><span class="gaji-val">${Rp(m.tarif)}</span></div>
-      </div>
-      <div class="gaji-total"><span class="gaji-total-label">Total Gaji Mesin</span><span class="gaji-total-val">${Rp(m.totalGaji)}</span></div>
-      <div class="status-row">
-        <button class="status-btn${m.status==="belum"?" belum":""}" onclick="setMesinStatus('${m.id}','belum')">✕ Belum</button>
-        <button class="status-btn${m.status==="dp"?" dp":""}" onclick="setMesinStatus('${m.id}','dp')">DP</button>
-        <button class="status-btn${m.status==="lunas"?" lunas":""}" onclick="setMesinStatus('${m.id}','lunas')">✓ Lunas</button>
-      </div>
-      <div style="color:var(--text3);font-size:11px;text-align:center;margin-top:8px">Metode: ${m.met}</div>
-    </div>`).join(""):`<div class="empty"><div class="empty-icon"></div><div class="empty-text">Tidak ada data gaji</div><div class="empty-sub">Input produksi dulu untuk menghitung gaji</div></div>`}
-  <div class="total-box"><div class="total-box-label">TOTAL GAJI SEMUA MESIN</div><div class="total-box-val">${Rp(total)}</div></div>`;
+  return '<div class="sec"><div class="sec-row"><div class="sec-dot"></div><div class="sec-title">Penggajian Mingguan</div></div></div>'
+    +'<div class="field" style="margin-bottom:14px">'
+    +'<label class="field-label">Pilih Minggu (Senin – Sabtu)</label>'
+    +'<select class="inp" onchange="gajiWeek=getWeekRange(this.value);go(&quot;gaji&quot;)">'+weekOpts+'</select></div>'
+    +'<div style="background:linear-gradient(135deg,#1D4ED8,#3B82F6);border-radius:16px;padding:16px;text-align:center;margin-bottom:14px;color:#fff">'
+    +'<div style="font-size:11px;opacity:.7;margin-bottom:4px">TOTAL GAJI MINGGU '+getWeekLabel(selWeek).toUpperCase()+'</div>'
+    +'<div style="font-size:28px;font-weight:900">'+Rp(totalNet)+'</div>'
+    +'<div style="font-size:11px;opacity:.7;margin-top:4px">'+allRekap.length+' mesin/pembuat aktif</div>'
+    +'<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">'
+    +'<button onclick="exportAllCSV()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">CSV Semua</button>'
+    +'<button onclick="exportAllPDF()" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.4);border-radius:10px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer">Print Semua</button>'
+    +'</div></div>'
+    +(allRekap.length===0
+      ?'<div class="empty"><div style="font-size:36px;margin-bottom:8px">📅</div><div style="font-size:14px;font-weight:600;color:#475569">Tidak ada produksi minggu ini</div></div>'
+      :kartu
+    );
 }
+
+function showDetailGaji(el){
+  var mesinId=el.dataset?el.dataset.id:el;var mesinNama=el.dataset?el.dataset.nm:arguments[1];
+  var selWeek=gajiWeek||getWeekRange(null);
+  var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  var dates=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(selWeek.senin);
+    d.setDate(d.getDate()+i);
+    dates.push(d.toISOString().slice(0,10));
+  }
+  var allProd=[...prodPav,...prodBuis].filter(function(p){
+    return p.mesinId===mesinId && isInWeek(p.date,selWeek);
+  });
+  var totalGaji=allProd.reduce(function(a,b){return a+(b.total||0);},0);
+  var totalMakan=allProd.reduce(function(a,b){return a+(b.uangMakan||0);},0);
+  var totalCetakan=allProd.reduce(function(a,b){return a+(b.gantiCetakan||0);},0);
+  var totalLain=allProd.reduce(function(a,b){return a+(b.lainLain||0);},0);
+  var totalTunjangan=totalMakan+totalCetakan+totalLain;
+  var totalBon=allProd.reduce(function(a,b){return a+(b.bon||0);},0);
+  var totalNet=totalGaji+totalTunjangan-totalBon;
+
+  var rows=dates.map(function(date,i){
+    var dayProds=allProd.filter(function(p){return p.date===date;});
+    if(dayProds.length===0){
+      return '<tr style="color:#94A3B8"><td style="padding:7px 6px;font-size:11px">'+days[i]+'<br><small>'+date.slice(5)+'</small></td>'
+        +'<td style="padding:7px 6px;font-size:11px;text-align:center">—</td>'
+        +'<td colspan="4" style="padding:7px 6px;font-size:11px;text-align:center">Libur/Tidak Produksi</td></tr>';
+    }
+    var gaji=dayProds.reduce(function(a,b){return a+(b.total||0);},0);
+    var makan=dayProds.reduce(function(a,b){return a+(b.uangMakan||0);},0);
+    var cetakan=dayProds.reduce(function(a,b){return a+(b.gantiCetakan||0);},0);
+    var lain=dayProds.reduce(function(a,b){return a+(b.lainLain||0);},0);
+    var bon=dayProds.reduce(function(a,b){return a+(b.bon||0);},0);
+    var net=gaji+makan+cetakan+lain-bon;
+    var prodNames=dayProds.map(function(p){
+      return p.jml.toLocaleString("id-ID")+" biji "+p.nama.replace("Paving ","").replace("Buis Beton ","");
+    }).join("<br>");
+    return '<tr style="border-top:1px solid #F1F5F9">'
+      +'<td style="padding:7px 6px;font-size:11px;font-weight:600">'+days[i]+'<br><small style="color:#94A3B8">'+date.slice(5)+'</small></td>'
+      +'<td style="padding:7px 6px;font-size:10px;color:#475569">'+prodNames+'</td>'
+      +'<td style="padding:7px 6px;font-size:11px;text-align:right;color:#2563EB">'+Rp(gaji)+'</td>'
+      +'<td style="padding:7px 6px;font-size:11px;text-align:right;color:#15803D">'+Rp(makan+cetakan+lain)+'</td>'
+      +'<td style="padding:7px 6px;font-size:11px;text-align:right;color:#DC2626">'+(bon>0?'-'+Rp(bon):'—')+'</td>'
+      +'<td style="padding:7px 6px;font-size:11px;text-align:right;font-weight:700;color:#F97316">'+Rp(net)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  var stat=gajiStatus[selWeek.senin+'_'+mesinId]||'belum';
+  var statBadge=stat==='sesuai'
+    ?'<span style="background:#DCFCE7;color:#15803D;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700">&#10003; Terkonfirmasi</span>'
+    :'<span style="background:#FEF9C3;color:#92400E;border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700">Belum Dikonfirmasi</span>';
+
+  var h='<div class="modal-title">Slip Gaji — '+mesinNama+'</div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'
+    +'<div style="font-size:11px;color:#94A3B8">'+getWeekLabel(selWeek)+'</div>'
+    +statBadge+'</div>'
+    // Tabel rincian
+    +'<div style="overflow-x:auto;margin-bottom:12px">'
+    +'<table style="width:100%;border-collapse:collapse;min-width:360px">'
+    +'<thead><tr style="background:#F8FAFC">'
+    +'<th style="padding:7px 6px;text-align:left;font-size:10px;color:#94A3B8;font-weight:600">Hari</th>'
+    +'<th style="padding:7px 6px;text-align:left;font-size:10px;color:#94A3B8;font-weight:600">Produksi</th>'
+    +'<th style="padding:7px 6px;text-align:right;font-size:10px;color:#94A3B8;font-weight:600">Gaji</th>'
+    +'<th style="padding:7px 6px;text-align:right;font-size:10px;color:#94A3B8;font-weight:600">Tunjangan</th>'
+    +'<th style="padding:7px 6px;text-align:right;font-size:10px;color:#94A3B8;font-weight:600">BON</th>'
+    +'<th style="padding:7px 6px;text-align:right;font-size:10px;color:#94A3B8;font-weight:600">Net</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'<tfoot><tr style="background:#FFF7ED;border-top:2px solid #F97316">'
+    +'<td colspan="2" style="padding:8px 6px;font-weight:700;font-size:12px">TOTAL</td>'
+    +'<td style="padding:8px 6px;text-align:right;font-weight:700;color:#2563EB;font-size:12px">'+Rp(totalGaji)+'</td>'
+    +'<td style="padding:8px 6px;text-align:right;font-weight:700;color:#15803D;font-size:12px">'+Rp(totalTunjangan)+'</td>'
+    +'<td style="padding:8px 6px;text-align:right;font-weight:700;color:#DC2626;font-size:12px">'+(totalBon>0?'-'+Rp(totalBon):'—')+'</td>'
+    +'<td style="padding:8px 6px;text-align:right;font-weight:900;font-size:16px;color:#F97316">'+Rp(totalNet)+'</td>'
+    +'</tr></tfoot></table></div>'
+    // Rincian tunjangan
+    +(totalMakan||totalCetakan||totalLain
+      ?'<div style="background:#F0FDF4;border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px">'
+       +'<div style="font-weight:700;color:#15803D;margin-bottom:6px">Rincian Tunjangan:</div>'
+       +(totalMakan?'<div style="display:flex;justify-content:space-between"><span>Uang Makan</span><span>'+Rp(totalMakan)+'</span></div>':'')
+       +(totalCetakan?'<div style="display:flex;justify-content:space-between"><span>Ganti Cetakan</span><span>'+Rp(totalCetakan)+'</span></div>':'')
+       +(totalLain?'<div style="display:flex;justify-content:space-between"><span>Biaya Lain-lain</span><span>'+Rp(totalLain)+'</span></div>':'')
+       +(totalBon?'<div style="display:flex;justify-content:space-between;color:#DC2626"><span>BON (Potongan)</span><span>-'+Rp(totalBon)+'</span></div>':'')
+       +'</div>':''
+    )
+    // Action buttons
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    +'<button onclick="konfirmasiGaji(this)" data-id="'+mesinId+'" data-nm="'+mesinNama+'" '
+    +'style="border:none;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer;'
+    +(stat==='sesuai'?'background:#16A34A;color:#fff;':'background:#FEF3C7;color:#92400E;border:1.5px solid #FCD34D;')
+    +'">'
+    +(stat==='sesuai'?'&#10003; Confirmed - Batalkan':'Konfirmasi Sesuai')+'</button>'
+    +'<button onclick="exportCSV(this)" data-id="'+mesinId+'" data-nm="'+mesinNama+'" '
+    +'style="background:#F0FDF4;color:#15803D;border:1.5px solid #BBF7D0;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">Export CSV</button>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+    +'<button onclick="printSlipGaji(this)" data-id="'+mesinId+'" data-nm="'+mesinNama+'" '
+    +'style="background:#FFF7ED;color:#C2410C;border:1.5px solid #FED7AA;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">Print Slip Gaji</button>'
+    +'<button onclick="shareWA(this)" data-id="'+mesinId+'" data-nm="'+mesinNama+'" '
+    +'style="background:#DCFCE7;color:#15803D;border:1.5px solid #86EFAC;border-radius:10px;padding:10px;font-size:12px;font-weight:700;cursor:pointer">Share WhatsApp</button>'
+    +'</div>'
+    +'<button class="btn btn-ghost btn-full" onclick="closeModalForce()">Tutup</button>';
+  openModal(h);
+}
+
 function setMesinStatus(id,s){
   mesinList=mesinList.map(m=>m.id===id?{...m,gajiStatus:s}:m);
   const m=mesinList.find(x=>x.id===id);
@@ -1131,7 +1569,7 @@ function autoFillPlat(sel){
   var jenisEl=document.getElementById("sJenis");
   if(sopir&&sopir.plat&&platEl){
     platEl.value=sopir.plat;
-    if(jenisEl&&sopir.jenis){
+    if(jenisEl&&sopir.jenis&&jenisEl.options&&jenisEl.options.length){
       for(var i=0;i<jenisEl.options.length;i++){
         if(jenisEl.options[i].text===sopir.jenis){jenisEl.selectedIndex=i;break;}
       }
@@ -1140,6 +1578,7 @@ function autoFillPlat(sel){
     platEl.value="";
   }
 }
+
 
 function setArah(a){_secArah=a;go("security");}
 function setSatuan(s){_secSatuan=s;go("security");}
@@ -1359,7 +1798,8 @@ function hapusSec(id){
   showToast("Log dihapus");go("riwayat_sec");
 }
 
-function editSopir(id){
+function editSopir(el){
+  var id=el&&el.dataset?el.dataset.id:el;
   var s=masterSopir.find(function(x){return x.id===id;});
   if(!s)return;
   var jenisOpts=['Truk','Pickup','Mobil','Motor','Lainnya'].map(function(j){
@@ -1449,7 +1889,9 @@ function showToast(msg){
   var t=document.getElementById("toast");
   if(t){t.textContent=msg;t.classList.add("show");setTimeout(function(){t.classList.remove("show");},3000);}
 }
-function openEditRw(type,id){
+function openEditRw(el){
+  var type=el&&el.dataset?el.dataset.type:el;
+  var id=el&&el.dataset?parseInt(el.dataset.id):arguments[1];
   var data=type==="paving"?prodPav:prodBuis;
   var item=data.find(function(x){return x.id===id;});
   if(!item){alert("Data tidak ditemukan");return;}
@@ -1462,11 +1904,13 @@ function openEditRw(type,id){
     +'<input id="editCat" class="inp" value="'+(item.cat||'')+'"/></div>':'')
     +'<div style="display:flex;gap:8px;margin-top:16px">'
     +'<button class="btn btn-ghost" style="flex:1" onclick="closeModalForce()">Batal</button>'
-    +'<button class="btn btn-blue" style="flex:1" onclick="saveEditRw(&quot;'+type+'&quot;,'+id+')">Simpan</button>'
+    +'<button class="btn btn-blue" style="flex:1" onclick="saveEditRw(this)" data-type="'+type+'" data-id="'+id+'">Simpan</button>'
     +'</div>';
   openModal(h);
 }
-function saveEditRw(type,id){
+function saveEditRw(el){
+  var type=el&&el.dataset?el.dataset.type:el;
+  var id=el&&el.dataset?parseInt(el.dataset.id):arguments[1];
   var newJml=parseInt(document.getElementById("editJml").value);
   if(!newJml||newJml<1){alert("Jumlah harus lebih dari 0");return;}
   var newCat=document.getElementById("editCat")?document.getElementById("editCat").value:"";
@@ -1492,7 +1936,9 @@ function saveEditRw(type,id){
   }
   showToast("Produksi diperbarui");go(NAV);
 }
-function hapusRw(type,id){
+function hapusRw(el){
+  var type=el&&el.dataset?el.dataset.type:el;
+  var id=el&&el.dataset?parseInt(el.dataset.id):arguments[1];
   var data=type==="paving"?prodPav:prodBuis;
   var item=data.find(function(x){return x.id===id;});
   if(!item)return;
@@ -1510,7 +1956,7 @@ function pgMaster(){
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9">'
       +'<div><div style="font-weight:600;font-size:13px">'+s.nama+'</div>'
       +'<div style="font-size:11px;color:#94A3B8">'+(s.plat||'-')+' · '+(s.jenis||'-')+'</div></div>'
-      +'<button onclick="editSopir(&quot;'+s.id+'&quot;)" style="background:#EFF6FF;color:#2563EB;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Edit</button>'
+      +'<button onclick="editSopir(this)" data-id="'+s.id+'" style="background:#EFF6FF;color:#2563EB;border:none;border-radius:8px;padding:5px 12px;font-size:11px;font-weight:600;cursor:pointer">Edit</button>'
       +'</div>';
   }).join('');
   var akunTable=USERS.map(function(u){
@@ -1537,6 +1983,336 @@ function pgMaster(){
     +sopirTable+'</div>'
     +'<div class="card"><div style="font-weight:700;font-size:14px;margin-bottom:10px">Akun Pengguna</div>'+akunTable+'</div>';
 }
+
+
+// ── Helper minggu kerja (Senin-Sabtu) ──────────────────
+function getWeekRange(dateStr){
+  // Kembalikan {senin, sabtu} dari tanggal mana saja dalam minggu itu
+  var d=dateStr?new Date(dateStr):new Date();
+  var day=d.getDay(); // 0=Minggu,1=Senin,...,6=Sabtu
+  // Jika Minggu, anggap masuk minggu berikutnya
+  var diffToMon=day===0?1:(-(day-1));
+  var mon=new Date(d);mon.setDate(d.getDate()+diffToMon);
+  var sat=new Date(mon);sat.setDate(mon.getDate()+5);
+  var fmt=function(x){return x.toISOString().slice(0,10);};
+  return {senin:fmt(mon),sabtu:fmt(sat)};
+}
+
+function isInWeek(dateStr, weekRange){
+  return dateStr>=weekRange.senin && dateStr<=weekRange.sabtu;
+}
+
+function getWeekLabel(weekRange){
+  var opt={day:"numeric",month:"short"};
+  var s=new Date(weekRange.senin).toLocaleDateString("id-ID",opt);
+  var e=new Date(weekRange.sabtu).toLocaleDateString("id-ID",opt);
+  return s+" – "+e;
+}
+
+// Ambil semua minggu unik dari data
+function getUniqueWeeks(data){
+  var weeks={};
+  data.forEach(function(d){
+    var w=getWeekRange(d.date);
+    weeks[w.senin]=w;
+  });
+  return Object.values(weeks).sort(function(a,b){return b.senin.localeCompare(a.senin);});
+}
+
+// Rekap per mesin untuk satu minggu
+function rekapMesinWeek(data, weekRange){
+  var byMesin={};
+  data.filter(function(d){return isInWeek(d.date,weekRange);}).forEach(function(d){
+    if(!byMesin[d.mesinId]){
+      byMesin[d.mesinId]={mesinId:d.mesinId,mesinNama:d.mesinNama,items:[],
+        totalProd:0,totalCost:0,totalMakan:0,totalCetakan:0,totalLain:0,totalBon:0,totalBersih:0};
+    }
+    var m=byMesin[d.mesinId];
+    m.items.push(d);
+    m.totalProd+=d.jml;
+    m.totalCost+=d.total||0;
+    m.totalMakan+=(d.uangMakan||0);
+    m.totalCetakan+=(d.gantiCetakan||0);
+    m.totalLain+=(d.lainLain||0);
+    m.totalBon+=(d.bon||0);
+    m.totalBersih+=(d.totalBersih||(d.total||0));
+  });
+  return Object.values(byMesin);
+}
+
+
+// ── Konfirmasi Gaji ────────────────────────────────────
+function konfirmasiGaji(el){
+  var mesinId=el&&el.dataset?el.dataset.id:el;
+  var mesinNama=el&&el.dataset?el.dataset.nm:arguments[1];
+  // Use week from button dataset, or from gajiWeek, or current week
+  var weekSenin=el&&el.dataset&&el.dataset.week?el.dataset.week:null;
+  var selWeek=weekSenin?{senin:weekSenin}:(gajiWeek||getWeekRange(null));
+  var key=selWeek.senin+'_'+mesinId;
+  var stat=gajiStatus[key]||'belum';
+  var nowSesuai;
+  if(stat==='sesuai'){
+    gajiStatus[key]='belum';
+    nowSesuai=false;
+    showToast(mesinNama+' - Konfirmasi dibatalkan');
+  } else {
+    gajiStatus[key]='sesuai';
+    nowSesuai=true;
+    showToast(mesinNama+' - Terkonfirmasi! ✅');
+  }
+  // Tutup modal jika terbuka
+  var modal=document.getElementById('modalBg');
+  if(modal) modal.classList.remove('show');
+  // Re-render halaman gaji
+  var mc=document.getElementById('mc');
+  if(mc && NAV==='gaji') mc.innerHTML=pgGaji();
+}
+
+
+
+
+// ── Export CSV per mesin ───────────────────────────────
+function exportCSV(el){
+  var mesinId=el.dataset?el.dataset.id:el;var mesinNama=el.dataset?el.dataset.nm:arguments[1];
+  var selWeek=gajiWeek||getWeekRange(null);
+  var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  var dates=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(selWeek.senin);d.setDate(d.getDate()+i);
+    dates.push({label:days[i],date:d.toISOString().slice(0,10)});
+  }
+  var allProd=[...prodPav,...prodBuis].filter(function(p){
+    return p.mesinId===mesinId && isInWeek(p.date,selWeek);
+  });
+  var rows=[
+    ['UD. Jaya Berkah - Slip Gaji Mingguan'],
+    ['Mesin/Pembuat',mesinNama],
+    ['Periode',getWeekLabel(selWeek)],
+    [''],
+    ['Hari','Tanggal','Produk','Jumlah (biji)','Gaji Produksi','Uang Makan','Ganti Cetakan','Biaya Lain','BON','Net Gaji']
+  ];
+  var totGaji=0,totMakan=0,totCetakan=0,totLain=0,totBon=0,totNet=0;
+  dates.forEach(function(day){
+    var dp=allProd.filter(function(p){return p.date===day.date;});
+    if(dp.length===0){
+      rows.push([day.label,day.date,'Libur','0','0','0','0','0','0','0']);
+      return;
+    }
+    dp.forEach(function(p){
+      var gaji=p.total||0,makan=p.uangMakan||0,cetakan=p.gantiCetakan||0;
+      var lain=p.lainLain||0,bon=p.bon||0,net=gaji+makan+cetakan+lain-bon;
+      rows.push([day.label,day.date,p.nama,p.jml,gaji,makan,cetakan,lain,bon,net]);
+      totGaji+=gaji;totMakan+=makan;totCetakan+=cetakan;totLain+=lain;totBon+=bon;totNet+=net;
+    });
+  });
+  rows.push(['']);
+  rows.push(['TOTAL','','','',totGaji,totMakan,totCetakan,totLain,totBon,totNet]);
+  var csv=rows.map(function(r){
+    return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');
+  }).join("\n");
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='SlipGaji_'+mesinNama.replace(/\s/g,'_')+'_'+selWeek.senin+'.csv';
+  a.click();URL.revokeObjectURL(url);
+  showToast('CSV '+mesinNama+' berhasil diunduh!');
+}
+
+// ── Export CSV Semua Mesin ─────────────────────────────
+function exportAllCSV(){
+  var selWeek=gajiWeek||getWeekRange(null);
+  var allRekap=[...rekapMesinWeek(prodPav,selWeek),...rekapMesinWeek(prodBuis,selWeek)];
+  var rows=[
+    ['UD. Jaya Berkah - Rekap Gaji Semua Mesin'],
+    ['Periode',getWeekLabel(selWeek)],
+    [''],
+    ['Mesin/Pembuat','Total Produksi (biji)','Gaji Produksi','Tunjangan Total','BON','Net Gaji','Status']
+  ];
+  var grandTotal=0;
+  allRekap.forEach(function(m){
+    var stat=gajiStatus[(selWeek.senin+'_'+m.mesinId)]||'belum';
+    rows.push([m.mesinNama,m.totalProd,m.totalCost,m.totalMakan+m.totalCetakan+m.totalLain,m.totalBon,m.totalBersih,stat==='sesuai'?'Sesuai':'Belum Konfirmasi']);
+    grandTotal+=m.totalBersih;
+  });
+  rows.push(['TOTAL','','','','',grandTotal,'']);
+  var csv=rows.map(function(r){
+    return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');
+  }).join("\n");
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url;a.download='RekapGaji_'+selWeek.senin+'_s/d_'+selWeek.sabtu+'.csv';
+  a.click();URL.revokeObjectURL(url);
+  showToast('CSV rekap semua mesin diunduh!');
+}
+
+// ── Print Slip Gaji ────────────────────────────────────
+function printSlipGaji(el){
+  var mesinId=el.dataset?el.dataset.id:el;var mesinNama=el.dataset?el.dataset.nm:arguments[1];
+  var selWeek=gajiWeek||getWeekRange(null);
+  var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  var dates=[];
+  for(var i=0;i<6;i++){
+    var d=new Date(selWeek.senin);d.setDate(d.getDate()+i);
+    dates.push({label:days[i],date:d.toISOString().slice(0,10)});
+  }
+  var allProd=[...prodPav,...prodBuis].filter(function(p){
+    return p.mesinId===mesinId && isInWeek(p.date,selWeek);
+  });
+  var totGaji=allProd.reduce(function(a,b){return a+(b.total||0);},0);
+  var totMakan=allProd.reduce(function(a,b){return a+(b.uangMakan||0);},0);
+  var totCetakan=allProd.reduce(function(a,b){return a+(b.gantiCetakan||0);},0);
+  var totLain=allProd.reduce(function(a,b){return a+(b.lainLain||0);},0);
+  var totBon=allProd.reduce(function(a,b){return a+(b.bon||0);},0);
+  var totNet=totGaji+totMakan+totCetakan+totLain-totBon;
+
+  var tableRows=dates.map(function(day){
+    var dp=allProd.filter(function(p){return p.date===day.date;});
+    if(dp.length===0) return '<tr style="color:#999"><td>'+day.label+'</td><td colspan="5" style="text-align:center">Libur</td></tr>';
+    return dp.map(function(p,i){
+      var gaji=p.total||0,makan=p.uangMakan||0,cetakan=p.gantiCetakan||0,lain=p.lainLain||0,bon=p.bon||0;
+      return '<tr>'+(i===0?'<td rowspan="'+dp.length+'">'+day.label+'<br><small>'+day.date.slice(5)+'</small></td>':'')
+        +'<td>'+p.nama.replace('Paving ','').replace('Buis Beton ','')+'<br><small>'+p.jml.toLocaleString('id-ID')+' biji</small></td>'
+        +'<td class="r">'+gaji.toLocaleString('id-ID')+'</td>'
+        +'<td class="r">'+((makan+cetakan+lain)>0?(makan+cetakan+lain).toLocaleString('id-ID'):'—')+'</td>'
+        +'<td class="r">'+(bon>0?bon.toLocaleString('id-ID'):'—')+'</td>'
+        +'<td class="r b">'+(gaji+makan+cetakan+lain-bon).toLocaleString('id-ID')+'</td>'
+        +'</tr>';
+    }).join('');
+  }).join('');
+
+  var slipHTML='<!DOCTYPE html><html><head><meta charset="UTF-8"/>'
+    +'<title>Slip Gaji - '+mesinNama+'</title>'
+    +'<style>'
+    +'*{margin:0;padding:0;box-sizing:border-box}'
+    +'body{font-family:"Courier New",monospace;font-size:11px;color:#000;background:#fff}'
+    +'.slip{width:148mm;min-height:100mm;margin:0 auto;padding:8mm 10mm}'
+    +'.logo{text-align:center;border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:8px}'
+    +'.co{font-size:16px;font-weight:900;letter-spacing:1px}'
+    +'.addr{font-size:9px;color:#555}'
+    +'.ttl{font-size:13px;font-weight:700;margin:4px 0}'
+    +'.meta{display:flex;justify-content:space-between;margin-bottom:8px;font-size:10px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:8px}'
+    +'th{background:#f5f5f5;border:1px solid #ccc;padding:4px 5px;font-size:9px;text-align:left}'
+    +'td{border:1px solid #ddd;padding:4px 5px;font-size:10px;vertical-align:top}'
+    +'.r{text-align:right}'
+    +'.b{font-weight:700}'
+    +'.total-row td{background:#fff8e6;border-top:2px solid #000;font-weight:700}'
+    +'.net{text-align:center;font-size:18px;font-weight:900;border:2px solid #000;padding:8px;margin:8px 0;border-radius:4px}'
+    +'.sign{display:flex;justify-content:space-between;margin-top:16px}'
+    +'.sign-box{text-align:center;width:45%}'
+    +'.sign-line{border-top:1px solid #000;margin-top:24px;padding-top:4px;font-size:9px}'
+    +'.note{font-size:9px;color:#666;text-align:center;margin-top:8px;border-top:1px dashed #ccc;padding-top:6px}'
+    +'@media print{'
+    +'@page{size:A6 portrait;margin:5mm}'
+    +'body{font-size:10px}'
+    +'.slip{width:100%;padding:0}'
+    +'}'
+    +'</style></head><body>'
+    +'<div class="slip">'
+    +'<div class="logo">'
+    +'<div class="co">UD. JAYA BERKAH</div>'
+    +'<div class="addr">Kudus, Jawa Tengah | Pabrik Paving & Buis Beton</div>'
+    +'<div class="ttl">SLIP GAJI MINGGUAN</div>'
+    +'</div>'
+    +'<div class="meta">'
+    +'<div><b>Nama :</b> '+mesinNama+'</div>'
+    +'<div><b>Periode :</b> '+getWeekLabel(selWeek)+'</div>'
+    +'</div>'
+    +'<table>'
+    +'<thead><tr><th>Hari</th><th>Produk</th><th class="r">Gaji</th><th class="r">Tunjangan</th><th class="r">BON</th><th class="r">Net</th></tr></thead>'
+    +'<tbody>'+tableRows+'</tbody>'
+    +'<tfoot><tr class="total-row"><td colspan="2"><b>TOTAL</b></td>'
+    +'<td class="r">'+totGaji.toLocaleString('id-ID')+'</td>'
+    +'<td class="r">'+((totMakan+totCetakan+totLain)>0?(totMakan+totCetakan+totLain).toLocaleString('id-ID'):'—')+'</td>'
+    +'<td class="r">'+(totBon>0?totBon.toLocaleString('id-ID'):'—')+'</td>'
+    +'<td class="r b">'+totNet.toLocaleString('id-ID')+'</td>'
+    +'</tr></tfoot></table>'
+    +(totMakan||totCetakan||totLain
+      ?'<div style="font-size:9px;margin-bottom:6px;background:#f9f9f9;padding:4px 6px;border:1px dashed #ccc">'
+       +'<b>Rincian Tunjangan:</b>'
+       +(totMakan?' Uang Makan Rp '+totMakan.toLocaleString('id-ID'):'')
+       +(totCetakan?' | Ganti Cetakan Rp '+totCetakan.toLocaleString('id-ID'):'')
+       +(totLain?' | Lain-lain Rp '+totLain.toLocaleString('id-ID'):'')
+       +(totBon?' | BON -Rp '+totBon.toLocaleString('id-ID'):'')
+       +'</div>':''
+    )
+    +'<div class="net">NET GAJI: Rp '+totNet.toLocaleString('id-ID')+'</div>'
+    +'<div class="sign">'
+    +'<div class="sign-box">Penerima<div class="sign-line">('+mesinNama+')</div></div>'
+    +'<div class="sign-box">Mengetahui<div class="sign-line">(Mandor/Admin)</div></div>'
+    +'</div>'
+    +'<div class="note">Dicetak: '+new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"})+'</div>'
+    +'</div>'
+    +'<scr'+'ipt>window.onload=function(){window.print();window.onafterprint=function(){window.close();};};<\/sc'+'ript>'
+    +'</body></html>';
+
+  var w=window.open('','_blank','width=600,height=700');
+  if(w){w.document.write(slipHTML);w.document.close();}
+  closeModalForce();
+}
+
+// ── Print Semua Mesin ──────────────────────────────────
+function exportAllPDF(){
+  var selWeek=gajiWeek||getWeekRange(null);
+  var allRekap=[...rekapMesinWeek(prodPav,selWeek),...rekapMesinWeek(prodBuis,selWeek)];
+  var slips=allRekap.map(function(m){
+    var days=["Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+    var dates=[];
+    for(var i=0;i<6;i++){
+      var d=new Date(selWeek.senin);d.setDate(d.getDate()+i);
+      dates.push({label:days[i],date:d.toISOString().slice(0,10)});
+    }
+    var allProd=[...prodPav,...prodBuis].filter(function(p){
+      return p.mesinId===m.mesinId && isInWeek(p.date,selWeek);
+    });
+    var rows=dates.map(function(day){
+      var dp=allProd.filter(function(p){return p.date===day.date;});
+      if(dp.length===0) return '<tr style="color:#999"><td>'+day.label+'</td><td colspan="5" style="text-align:center;font-size:9px">Libur</td></tr>';
+      return dp.map(function(p,i){
+        var g=p.total||0,mk=p.uangMakan||0,ct=p.gantiCetakan||0,ll=p.lainLain||0,bn=p.bon||0;
+        return '<tr>'+(i===0?'<td rowspan="'+dp.length+'">'+day.label+'</td>':'')
+          +'<td>'+p.nama.slice(0,20)+'<br><small>'+p.jml.toLocaleString('id-ID')+' biji</small></td>'
+          +'<td class="r">'+g.toLocaleString('id-ID')+'</td>'
+          +'<td class="r">'+((mk+ct+ll)>0?(mk+ct+ll).toLocaleString('id-ID'):'—')+'</td>'
+          +'<td class="r">'+(bn>0?bn.toLocaleString('id-ID'):'—')+'</td>'
+          +'<td class="r b">'+(g+mk+ct+ll-bn).toLocaleString('id-ID')+'</td></tr>';
+      }).join('');
+    }).join('');
+    var net=m.totalBersih;
+    return '<div class="slip">'
+      +'<div class="logo"><div class="co">UD. JAYA BERKAH</div>'
+      +'<div class="addr">Kudus, Jawa Tengah</div>'
+      +'<div class="ttl">SLIP GAJI MINGGUAN</div></div>'
+      +'<div class="meta"><div><b>Nama:</b> '+m.mesinNama+'</div><div><b>Periode:</b> '+getWeekLabel(selWeek)+'</div></div>'
+      +'<table><thead><tr><th>Hari</th><th>Produk</th><th class="r">Gaji</th><th class="r">Tunjangan</th><th class="r">BON</th><th class="r">Net</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table>'
+      +'<div class="net">NET GAJI: Rp '+net.toLocaleString('id-ID')+'</div>'
+      +'<div class="sign"><div class="sb">Penerima<div class="sl">('+m.mesinNama+')</div></div>'
+      +'<div class="sb">Mengetahui<div class="sl">(Mandor/Admin)</div></div></div>'
+      +'</div>';
+  }).join('<div style="page-break-after:always"></div>');
+
+  var html2='<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Slip Gaji Semua</title>'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:"Courier New",monospace;font-size:10px}'
+    +'.slip{width:148mm;margin:0 auto;padding:8mm 10mm;page-break-inside:avoid}'
+    +'.logo{text-align:center;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:6px}'
+    +'.co{font-size:15px;font-weight:900}.addr{font-size:9px;color:#555}.ttl{font-size:12px;font-weight:700}'
+    +'.meta{display:flex;justify-content:space-between;margin-bottom:6px;font-size:10px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:6px}th{background:#f5f5f5;border:1px solid #ccc;padding:3px 4px;font-size:9px}'
+    +'td{border:1px solid #ddd;padding:3px 4px;font-size:9px;vertical-align:top}.r{text-align:right}.b{font-weight:700}'
+    +'.net{text-align:center;font-size:16px;font-weight:900;border:2px solid #000;padding:6px;margin:6px 0}'
+    +'.sign{display:flex;justify-content:space-between;margin-top:14px}'
+    +'.sb{text-align:center;width:45%}.sl{border-top:1px solid #000;margin-top:20px;padding-top:3px;font-size:9px}'
+    +'@media print{@page{size:A6 portrait;margin:5mm}body{font-size:9px}}'
+    +'</style></head><body>'+slips
+    +'<scr'+'ipt>window.onload=function(){window.print();};<\/sc'+'ript></body></html>';
+
+  var w=window.open('','_blank','width=700,height=800');
+  if(w){w.document.write(html2);w.document.close();}
+}
+
+// ── Share WhatsApp ─────────────────────────────────────
 </script>
 <div id="toast" class="toast"></div>
 </body>
